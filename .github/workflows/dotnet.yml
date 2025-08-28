@@ -1,0 +1,76 @@
+# This is a GitHub Actions workflow file that defines a CI/CD pipeline for a .NET web application.
+# It automates the process of building, testing, and deploying the application to Azure.
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-net
+
+name: Build and Deploy Azure Retail Hub
+
+# This section defines the triggers for the workflow.
+# It will run automatically on any push or pull request to the "master" branch.
+on:
+  push:
+    branches: [ "master" ]
+  pull_request:
+    branches: [ "master" ]
+
+jobs:
+  # The 'build' job is responsible for compiling and testing the code.
+  build:
+    runs-on: ubuntu-latest # Specifies that the job will run on a fresh Ubuntu virtual machine.
+
+    steps:
+    # Step 1: Checks out the repository's code so the workflow can access it.
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    # Step 2: Sets up the specified version of the .NET SDK.
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        dotnet-version: 8.0.x
+
+    # Step 3: Restores all the project's NuGet package dependencies.
+    - name: Restore dependencies
+      run: dotnet restore
+
+    # Step 4: Builds the project in Release configuration.
+    - name: Build
+      run: dotnet build --configuration Release --no-restore
+
+    # Step 5: Publishes the application to a directory named 'webapp'.
+    # The output from this step will be used by the deployment job.
+    - name: Publish
+      run: dotnet publish ./AzureRetailHub/AzureRetailHub.csproj -c Release -o ./webapp 
+
+    # Step 6: Uploads the published output as an artifact.
+    # This allows the 'deploy' job to download and use the build output.
+    - name: Upload artifact for deployment job
+      uses: actions/upload-artifact@v4
+      with:
+        name: .net-app
+        path: ./webapp
+
+  # The 'deploy' job is responsible for deploying the application to Azure.
+  deploy:
+    # This job will only run after the 'build' job has completed successfully.
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: 'Production'
+      url: ${{ steps.deploy-to-webapp.outputs.webapp-url }} # The URL of the deployed app.
+
+    steps:
+    # Step 1: Downloads the build output artifact that was uploaded by the 'build' job.
+    - name: Download artifact from build job
+      uses: actions/download-artifact@v4
+      with:
+        name: .net-app
+
+    # Step 2: Logs into Azure and deploys the application to your App Service.
+    # It uses a secret to securely access your Azure account.
+    - name: 'Deploy to Azure Web App'
+      id: deploy-to-webapp
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: 'st10447759'
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: .
