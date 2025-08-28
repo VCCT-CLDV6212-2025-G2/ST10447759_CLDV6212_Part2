@@ -1,0 +1,71 @@
+﻿@model AzureRetailHub.Models.ProductDto
+@{
+    ViewData["Title"] = "Product Details";
+}
+<div class="product-details">
+    <h2>@Model.Name</h2>
+
+    <div class="details-container">
+        <div class="details-image">
+            @if (!string.IsNullOrEmpty(Model.ImageUrl))
+            {
+                <img src="@Model.ImageUrl" alt="@Model.Name" />
+            }
+        </div>
+        <div class="details-info">
+            <p class="details-price">@string.Format("{0:C}", Model.Price)</p>
+            <p class="details-desc">@Model.Description</p>
+            <p><a class="btn" href="/Products">← Back to Products</a></p>
+        </div>
+    </div>
+</div>
+
+<style>
+    .product-details {
+        margin-top: 20px;
+    }
+
+    .details-container {
+        display: flex;
+        gap: 24px;
+    }
+
+    .details-image img {
+        width: 360px;
+        height: auto;
+        border-radius: 12px;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+    }
+
+    .details-info {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .details-price {
+        font-size: 22px;
+        font-weight: 600;
+        color: #111;
+    }
+
+    .details-desc {
+        font-size: 16px;
+        color: #444;
+        line-height: 1.5;
+    }
+
+    .btn {
+        display: inline-block;
+        background: #111;
+        color: #fff;
+        padding: 8px 16px;
+        border-radius: 6px;
+        text-decoration: none;
+    }
+
+        .btn:hover {
+            background: #333;
+        }
+</style>

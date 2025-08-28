@@ -1,0 +1,165 @@
+﻿@model AzureRetailHub.Models.CreateOrderViewModel
+
+@{
+    ViewData["Title"] = "Create New Order";
+}
+
+<h1>Create New Order</h1>
+<hr />
+
+<div class="row">
+    <div class="col-md-8">
+        <form id="orderForm" asp-action="Create" method="post">
+            <!-- Hidden fields to store the final data -->
+            <input type="hidden" id="customerId" name="customerId" />
+            <input type="hidden" id="itemsJson" name="itemsJson" />
+
+            <!-- Customer Selection -->
+            <div class="mb-4">
+                <h4>Customer Information</h4>
+                <div class="form-group">
+                    <label for="customerDropdown" class="control-label">Customer Name</label>
+                    <select id="customerDropdown" class="form-control">
+                        <option value="">-- Select a Customer --</option>
+                        @foreach (var customer in Model.AvailableCustomers)
+                        {
+                            <option value="@customer.RowKey">@customer.FullName</option>
+                        }
+                    </select>
+                </div>
+            </div>
+
+            <!-- Product Selection -->
+            <div class="mb-4">
+                <h4>Product Selection</h4>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="form-group">
+                            <label for="productDropdown">Product</label>
+                            <select id="productDropdown" class="form-control">
+                                <option value="">-- Select a Product --</option>
+                                @foreach (var product in Model.AvailableProducts)
+                                {
+                                    <option value="@product.RowKey" data-price="@product.Price.ToString("F2")">@product.Name</option>
+                                }
+                            </select>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="form-group">
+                            <label for="quantity">Quantity</label>
+                            <input type="number" id="quantity" class="form-control" value="1" min="1" />
+                        </div>
+                    </div>
+                    <div class="col-md-2 d-flex align-items-end">
+                        <button type="button" id="addProductBtn" class="btn btn-secondary w-100">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Summary -->
+            <div class="mb-4">
+                <h4>Order Summary</h4>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th>Price</th>
+                            <th>Total</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="orderItems">
+                        <!-- Items will be added here by JavaScript -->
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="3" class="text-end"><strong>Subtotal</strong></td>
+                            <td id="subtotal">R 0.00</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+
+            <div class="form-group">
+                <button type="submit" class="btn btn-primary">Submit Order</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const addProductBtn = document.getElementById('addProductBtn');
+            const orderItemsTbody = document.getElementById('orderItems');
+            const subtotalEl = document.getElementById('subtotal');
+            const orderForm = document.getElementById('orderForm');
+            const customerDropdown = document.getElementById('customerDropdown');
+            let orderItems = [];
+
+            addProductBtn.addEventListener('click', function () {
+                const productDropdown = document.getElementById('productDropdown');
+                const selectedOption = productDropdown.options[productDropdown.selectedIndex];
+                const quantityInput = document.getElementById('quantity');
+
+                if (!selectedOption.value || !quantityInput.value) {
+                    alert('Please select a product and enter a quantity.');
+                    return;
+                }
+
+                const item = {
+                    productId: selectedOption.value,
+                    productName: selectedOption.text,
+                    quantity: parseInt(quantityInput.value),
+                    price: parseFloat(selectedOption.dataset.price)
+                };
+
+                orderItems.push(item);
+                renderOrderItems();
+            });
+
+            function renderOrderItems() {
+                orderItemsTbody.innerHTML = '';
+                let currentSubtotal = 0;
+
+                orderItems.forEach((item, index) => {
+                    const total = item.quantity * item.price;
+                    currentSubtotal += total;
+
+                    const row = `
+                        <tr>
+                            <td>${item.productName}</td>
+                            <td>${item.quantity}</td>
+                            <td>R ${item.price.toFixed(2)}</td>
+                            <td>R ${total.toFixed(2)}</td>
+                            <td><button type="button" class="btn btn-danger btn-sm" onclick="removeItem(${index})">Remove</button></td>
+                        </tr>`;
+                    orderItemsTbody.innerHTML += row;
+                });
+
+                subtotalEl.textContent = `R ${currentSubtotal.toFixed(2)}`;
+            }
+
+            window.removeItem = function (index) {
+                orderItems.splice(index, 1);
+                renderOrderItems();
+            };
+
+            orderForm.addEventListener('submit', function (e) {
+                if (customerDropdown.value === "" || orderItems.length === 0) {
+                    e.preventDefault();
+                    alert("Please select a customer and add at least one product to the order.");
+                    return;
+                }
+
+                document.getElementById('customerId').value = customerDropdown.value;
+                document.getElementById('itemsJson').value = JSON.stringify(orderItems.map(item => {
+                    return { productId: item.productId, quantity: item.quantity, price: item.price };
+                }));
+            });
+        });
+    </script>
+}

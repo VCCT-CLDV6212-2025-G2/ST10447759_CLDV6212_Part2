@@ -1,0 +1,44 @@
+﻿@model AzureRetailHub.Controllers.HomeViewModel
+@{
+    ViewData["Title"] = "Home";
+}
+<section class="hero">
+    <div class="hero-banner" style="background-image: url('/images/hero.jpg');">
+        <h1 class="hero-title">Featured Products</h1>
+    </div>
+</section>
+
+<section class="section">
+    <h2 class="section-title">New Arrivals</h2>
+    <div class="product-grid">
+        @foreach (var p in Model.NewArrivals)
+        {
+            <a asp-controller="Products" asp-action="Details" asp-route-id="@p.RowKey" class="product-card">
+                @if (!string.IsNullOrEmpty(p.ImageUrl))
+                {
+                    <img src="@p.ImageUrl" alt="@p.Name" />
+                }
+                <div class="product-name">@p.Name</div>
+                <div class="product-price">@string.Format("{0:C}", p.Price)</div>
+            </a>
+
+        }
+    </div>
+</section>
+
+<section class="section">
+    <h2 class="section-title">Best Sellers</h2>
+    <div class="product-grid">
+        @foreach (var p in Model.BestSellers)
+        {
+            <div class="product-card">
+                @if (!string.IsNullOrEmpty(p.ImageUrl))
+                {
+                    <img src="@p.ImageUrl" alt="@p.Name" />
+                }
+                <div class="product-name">@p.Name</div>
+                <div class="product-price">@string.Format("{0:C}", p.Price)</div>
+            </div>
+        }
+    </div>
+</section>

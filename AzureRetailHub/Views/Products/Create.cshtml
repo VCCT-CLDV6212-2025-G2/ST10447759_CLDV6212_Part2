@@ -1,0 +1,33 @@
+﻿@model AzureRetailHub.Models.ProductDto
+@{
+    ViewData["Title"] = "Create Product";
+}
+<h2>Create Product</h2>
+
+<form asp-action="Create" method="post" enctype="multipart/form-data">
+    <div>
+        <label asp-for="Name"></label><br />
+        <input asp-for="Name" />
+        <span asp-validation-for="Name"></span>
+    </div>
+    <div>
+        <label asp-for="Description"></label><br />
+        <textarea asp-for="Description"></textarea>
+    </div>
+    <div>
+        <label asp-for="Price"></label><br />
+        <input asp-for="Price" />
+    </div>
+    <div>
+        <label>Image</label><br />
+        <input type="file" name="imageFile" accept="image/*" />
+    </div>
+    <div style="margin-top:12px;">
+        <button type="submit">Create Product</button>
+        <a asp-action="Index">Back to list</a>
+    </div>
+</form>
+
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

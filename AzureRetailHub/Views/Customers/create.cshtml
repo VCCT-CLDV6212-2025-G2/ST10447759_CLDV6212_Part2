@@ -1,0 +1,20 @@
+﻿@model AzureRetailHub.Models.CustomerDto
+@{
+    ViewData["Title"] = "Create Customer";
+}
+<h2>Create Customer</h2>
+<form asp-action="Create" method="post">
+    <div>
+        <label asp-for="FullName"></label>
+        <input asp-for="FullName" />
+    </div>
+    <div>
+        <label asp-for="Email"></label>
+        <input asp-for="Email" />
+    </div>
+    <div>
+        <label asp-for="Phone"></label>
+        <input asp-for="Phone" />
+    </div>
+    <button type="submit">Create</button>
+</form>

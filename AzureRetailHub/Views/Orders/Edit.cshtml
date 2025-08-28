@@ -1,0 +1,41 @@
+﻿@model AzureRetailHub.Models.OrderDto
+
+@{
+    ViewData["Title"] = "Edit Order Status";
+}
+
+<h1>Edit Order Status</h1>
+
+<h4>Order ID: @Model.RowKey.ToUpper()</h4>
+<hr />
+<div class="row">
+    <div class="col-md-4">
+        <form asp-action="Edit">
+            <input type="hidden" asp-for="RowKey" />
+
+            <div class="form-group mb-3">
+                <label class="control-label">Customer ID</label>
+                <input class="form-control" value="@Model.CustomerId" readonly />
+            </div>
+
+            <div class="form-group mb-3">
+                <label asp-for="Status" class="control-label"></label>
+                <select asp-for="Status" class="form-control">
+                    <option value="Processing">Processing</option>
+                    <option value="Shipped">Shipped</option>
+                    <option value="Delivered">Delivered</option>
+                    <option value="Finalized">Finalized</option>
+                    <option value="Cancelled">Cancelled</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <input type="submit" value="Save" class="btn btn-primary" />
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="mt-3">
+    <a asp-action="Index">Back to List</a>
+</div>

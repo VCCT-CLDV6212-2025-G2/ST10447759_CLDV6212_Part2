@@ -1,0 +1,66 @@
+﻿@model AzureRetailHub.Models.OrderDetailViewModel
+
+@{
+    ViewData["Title"] = "Order Details";
+}
+
+<h1>Order Details</h1>
+
+<div>
+    <h4>Order ID: @Model.Order.RowKey.ToUpper()</h4>
+    <hr />
+    <div class="row">
+        <div class="col-md-6">
+            <h5>Customer Information</h5>
+            <dl class="row">
+                <dt class="col-sm-4">Full Name</dt>
+                <dd class="col-sm-8">@Model.Customer.FullName</dd>
+
+                <dt class="col-sm-4">Email</dt>
+                <dd class="col-sm-8">@Model.Customer.Email</dd>
+
+                <dt class="col-sm-4">Phone</dt>
+                <dd class="col-sm-8">@Model.Customer.Phone</dd>
+            </dl>
+        </div>
+        <div class="col-md-6">
+            <h5>Order Summary</h5>
+            <dl class="row">
+                <dt class="col-sm-4">Order Date</dt>
+                <dd class="col-sm-8">@Model.Order.OrderDate.ToString("yyyy-MM-dd")</dd>
+
+                <dt class="col-sm-4">Status</dt>
+                <dd class="col-sm-8">@Model.Order.Status</dd>
+
+                <dt class="col-sm-4">Grand Total</dt>
+                <dd class="col-sm-8"><strong>@Model.TotalPrice.ToString("C", new System.Globalization.CultureInfo("en-ZA"))</strong></dd>
+            </dl>
+        </div>
+    </div>
+
+    <h5 class="mt-4">Order Items</h5>
+    <table class="table table-striped">
+        <thead class="table-dark">
+            <tr>
+                <th>Product</th>
+                <th>Quantity</th>
+                <th>Unit Price</th>
+                <th>Total Price</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var item in Model.Items)
+            {
+                <tr>
+                    <td>@item.ProductName</td>
+                    <td>@item.Quantity</td>
+                    <td>@item.Price.ToString("C", new System.Globalization.CultureInfo("en-ZA"))</td>
+                    <td>@item.TotalPrice.ToString("C", new System.Globalization.CultureInfo("en-ZA"))</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+<div class="mt-4">
+    <a asp-action="Index" class="btn btn-secondary">Back to List</a>
+</div>

@@ -1,0 +1,93 @@
+﻿@model IEnumerable<AzureRetailHub.Models.OrderDto>
+
+@{
+    ViewData["Title"] = "Orders";
+}
+
+<style>
+    .status-badge {
+        display: inline-block;
+        padding: .35em .65em;
+        font-size: .75em;
+        font-weight: 700;
+        line-height: 1;
+        color: #fff;
+        text-align: center;
+        white-space: nowrap;
+        vertical-align: baseline;
+        border-radius: .25rem;
+    }
+
+    .status-shipped {
+        background-color: #0d6efd;
+    }
+
+    .status-delivered {
+        background-color: #198754;
+    }
+
+    .status-processing {
+        background-color: #ffc107;
+        color: #000;
+    }
+
+    .status-cancelled {
+        background-color: #dc3545;
+    }
+
+    .status-new {
+        background-color: #6c757d;
+    }
+
+    .status-finalized {
+        background-color: #6610f2;
+    }
+    /* Added for Finalized */
+</style>
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1>Orders</h1>
+        <p class="text-muted">Manage your orders and view details.</p>
+    </div>
+    <a asp-action="Create" class="btn btn-primary">Create New Order</a>
+</div>
+
+<div class="card mb-4">
+</div>
+
+<div class="card">
+    <div class="table-responsive">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Order ID</th>
+                    <th>Customer Name</th>
+                    <th>Order Date</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="ordersTable">
+                @foreach (var item in Model)
+                {
+                    <tr>
+                        <td>@(item.RowKey.Length > 8 ? item.RowKey.Substring(0, 8).ToUpper() : item.RowKey.ToUpper())</td>
+                        <td>@item.CustomerId</td>
+                        <td>@item.OrderDate.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            <span class="status-badge status-@(item.Status?.ToLower())">@item.Status</span>
+                        </td>
+                        <td>
+                            <a asp-action="Edit" asp-route-id="@item.RowKey">Edit Status</a> |
+                            <a asp-action="Details" asp-route-id="@item.RowKey">View Details</a>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@section Scripts {
+}
