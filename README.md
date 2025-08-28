@@ -6,6 +6,9 @@ Azure Retail Hub is a comprehensive, admin-focused retail management web applica
 
 This project serves as a practical demonstration of cloud application development, showcasing how to build a full-stack web app that utilizes a suite of cloud services for different data persistence needs.
 
+URL TO Azure website: https://st10447759.azurewebsites.net/
+Youtube demonstration: https://www.youtube.com/watch?v=PKKvZhr1AJ0
+
 -----
 
 ## Features ✨
