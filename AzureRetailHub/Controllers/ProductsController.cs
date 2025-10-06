@@ -5,205 +5,190 @@
  * viewing, editing, and deleting products. It integrates with both the
  * TableStorageService (for metadata) and the BlobStorageService (for images).
  */
-
+using System;
+using System.Collections.Generic;
+using System.Threading.Tasks;
 using Azure;
 using Azure.Data.Tables;
-using AzureRetailHub.Models;
-using AzureRetailHub.Services;
-using AzureRetailHub.Settings;
+using AzureRetailHub.Models;      // ProductDto
+using AzureRetailHub.Services;    // TableStorageService, FunctionApiClient
+using AzureRetailHub.Settings;    // StorageOptions
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Threading.Tasks;
 
 namespace AzureRetailHub.Controllers
 {
     public class ProductsController : Controller
     {
-        // NOTE: Point out that this controller depends on two services, demonstrating dependency injection.
         private readonly TableStorageService _table;
-        private readonly BlobStorageService _blob;
         private readonly StorageOptions _opts;
+        private readonly FunctionApiClient _fx;
 
-        public ProductsController(TableStorageService table, BlobStorageService blob, IOptions<StorageOptions> options)
+        public ProductsController(
+            TableStorageService table,
+            IOptions<StorageOptions> options,
+            FunctionApiClient fx)
         {
             _table = table;
-            _blob = blob;
             _opts = options.Value;
+            _fx = fx;
         }
 
-        public async Task<IActionResult> Index()
+        // GET: Products (with simple search on Name)
+        public async Task<IActionResult> Index(string? q)
         {
             var list = new List<ProductDto>();
-            //  NOTE: This loop reads all product entities from Azure Table Storage and converts them
-            // into a list of 'ProductDto' models that can be used by the View.
-            await foreach (var e in _table.QueryEntitiesAsync(_opts.ProductsTable))
+            await foreach (var e in _table.QueryEntitiesAsync(_opts.ProductsTable, "PartitionKey eq 'PRODUCT'"))
             {
-                string name = e.GetString("Name") ?? "";
-                string desc = e.GetString("Description") ?? "";
-                double priceDouble = 0;
-                try { priceDouble = e.GetDouble("Price") ?? 0; } catch { }
-                string imageUrl = e.GetString("ImageUrl") ?? "";
-
-                var p = new ProductDto
+                var dto = MapToVm(e);
+                if (string.IsNullOrWhiteSpace(q) ||
+                    (dto.Name ?? string.Empty).Contains(q, StringComparison.OrdinalIgnoreCase))
                 {
-                    RowKey = e.RowKey,
-                    Name = name,
-                    Description = desc,
-                    Price = Convert.ToDecimal(priceDouble),
-                    ImageUrl = imageUrl
-                };
-                list.Add(p);
+                    list.Add(dto);
+                }
             }
+            ViewBag.Query = q;
             return View(list);
         }
 
-        public IActionResult Create() => View(new ProductDto());
-
-        [HttpPost]
-        [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Create(ProductDto product, IFormFile? imageFile)
-        {
-            if (!ModelState.IsValid) return View(product);
-            // VIDEO NOTE: This is where Blob Storage is used. If an image file is provided...
-            if (imageFile != null && imageFile.Length > 0)
-            {
-                var ext = Path.GetExtension(imageFile.FileName);
-                // Create a unique name for the blob to avoid naming conflicts.
-                var blobName = $"{Guid.NewGuid()}{ext}";
-                using var ms = new MemoryStream();
-                await imageFile.CopyToAsync(ms);
-                // ...call the Blob service to upload it and get the public URL.
-                product.ImageUrl = await _blob.UploadFileAsync(_opts.BlobContainer, blobName, ms);
-            }
-
-            // A TableEntity is a simple dictionary of key-value pairs.
-            var entity = new TableEntity("PRODUCT", product.RowKey)
-            {
-                {"Name", product.Name},
-                {"Description", product.Description ?? "" },
-                {"Price", Convert.ToDouble(product.Price)},
-                {"ImageUrl", product.ImageUrl ?? "" }
-            };
-
-            await _table.AddEntityAsync(_opts.ProductsTable, entity);
-
-            return RedirectToAction(nameof(Index));
-        }
-
+        // GET: Products/Details/{id}
         public async Task<IActionResult> Details(string id)
         {
-            if (string.IsNullOrEmpty(id)) return NotFound();
-            var entity = await _table.GetEntityAsync(_opts.ProductsTable, "PRODUCT", id);
-            if (entity == null) return NotFound();
-
-            var product = new ProductDto
+            if (string.IsNullOrWhiteSpace(id)) return NotFound();
+            try
             {
-                RowKey = entity.RowKey,
-                Name = entity.GetString("Name") ?? "",
-                Description = entity.GetString("Description") ?? "",
-                Price = Convert.ToDecimal(entity.GetDouble("Price") ?? 0),
-                ImageUrl = entity.GetString("ImageUrl") ?? ""
-            };
-
-            return View(product);
+                var entity = await _table.GetEntityAsync(_opts.ProductsTable, "PRODUCT", id);
+                if (entity == null) return NotFound();
+                return View(MapToVm(entity));
+            }
+            catch (RequestFailedException)
+            {
+                return NotFound();
+            }
         }
 
-        // ADDED: GET method for Edit
-        public async Task<IActionResult> Edit(string id)
-        {
-            if (string.IsNullOrEmpty(id)) return NotFound();
-            var entity = await _table.GetEntityAsync(_opts.ProductsTable, "PRODUCT", id);
-            if (entity == null) return NotFound();
+        // GET: Products/Create
+        public IActionResult Create() => View(new ProductDto());
 
-            var product = new ProductDto
-            {
-                RowKey = entity.RowKey,
-                Name = entity.GetString("Name") ?? "",
-                Description = entity.GetString("Description") ?? "",
-                Price = Convert.ToDecimal(entity.GetDouble("Price") ?? 0),
-                ImageUrl = entity.GetString("ImageUrl") ?? ""
-            };
-            return View(product);
-        }
-
-        // ADDED: POST method for Edit
+        // POST: Products/Create (image upload via Function + upsert via Function)
         [HttpPost]
         [ValidateAntiForgeryToken]
-        public async Task<IActionResult> Edit(string id, ProductDto product, IFormFile? imageFile)
+        public async Task<IActionResult> Create(ProductDto model, IFormFile? imageFile)
         {
-            if (id != product.RowKey) return BadRequest();
-            if (!ModelState.IsValid) return View(product);
+            if (!ModelState.IsValid) return View(model);
 
-            var entity = await _table.GetEntityAsync(_opts.ProductsTable, "PRODUCT", id);
-            if (entity == null) return NotFound();
+            var id = string.IsNullOrWhiteSpace(model.RowKey) ? Guid.NewGuid().ToString("N") : model.RowKey;
 
-            // Handle image update
-            if (imageFile != null && imageFile.Length > 0)
+            string? imageUrl = model.ImageUrl;
+            if (imageFile is not null && imageFile.Length > 0)
             {
-                // Delete the old image before uploading the new one
-                var oldImageUrl = entity.GetString("ImageUrl");
-                await _blob.DeleteFileAsync(_opts.BlobContainer, oldImageUrl);
-
-                // Upload new image
-                var ext = Path.GetExtension(imageFile.FileName);
-                var blobName = $"{Guid.NewGuid()}{ext}";
-                using var ms = new MemoryStream();
-                await imageFile.CopyToAsync(ms);
-                product.ImageUrl = await _blob.UploadFileAsync(_opts.BlobContainer, blobName, ms);
-            }
-            else
-            {
-                // Keep the old image if no new one is uploaded
-                product.ImageUrl = entity.GetString("ImageUrl");
+                imageUrl = await _fx.PostFileAsync("products/image", imageFile);
+                if (imageUrl is null)
+                {
+                    ModelState.AddModelError("", "Image upload failed via Functions API.");
+                    return View(model);
+                }
             }
 
-            entity["Name"] = product.Name;
-            entity["Description"] = product.Description ?? "";
-            entity["Price"] = Convert.ToDouble(product.Price);
-            entity["ImageUrl"] = product.ImageUrl ?? "";
+            var payload = new ProductUpsertDto(
+                RowKey: id,
+                Name: model.Name ?? string.Empty,
+                Description: model.Description,
+                Price: model.Price,
+                ImageUrl: imageUrl
+            );
 
-            await _table.UpdateEntityAsync(_opts.ProductsTable, entity);
+            var res = await _fx.PostJsonAsync("products", payload);
+            if (res is null)
+            {
+                ModelState.AddModelError("", "Product create failed via Functions API.");
+                return View(model);
+            }
+
             return RedirectToAction(nameof(Index));
         }
 
-        // ADDED: GET method for Delete
-        public async Task<IActionResult> Delete(string id)
+        // GET: Products/Edit/{id}
+        public async Task<IActionResult> Edit(string id)
         {
-            if (string.IsNullOrEmpty(id)) return NotFound();
-            var entity = await _table.GetEntityAsync(_opts.ProductsTable, "PRODUCT", id);
-            if (entity == null) return NotFound();
-
-            var product = new ProductDto
-            {
-                RowKey = entity.RowKey,
-                Name = entity.GetString("Name") ?? "",
-                Description = entity.GetString("Description") ?? "",
-                Price = Convert.ToDecimal(entity.GetDouble("Price") ?? 0),
-                ImageUrl = entity.GetString("ImageUrl") ?? ""
-            };
-            return View(product);
+            if (string.IsNullOrWhiteSpace(id)) return NotFound();
+            var e = await _table.GetEntityAsync(_opts.ProductsTable, "PRODUCT", id);
+            if (e is null) return NotFound();
+            return View(MapToVm(e));
         }
 
-        // ADDED: POST method for Delete
+        // POST: Products/Edit/{id} (image upload via Function + upsert via Function)
+        [HttpPost]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(string id, ProductDto model, IFormFile? imageFile)
+        {
+            if (id != model.RowKey) return BadRequest();
+            if (!ModelState.IsValid) return View(model);
+
+            string? imageUrl = model.ImageUrl;
+            if (imageFile is not null && imageFile.Length > 0)
+            {
+                imageUrl = await _fx.PostFileAsync("products/image", imageFile);
+                if (imageUrl is null)
+                {
+                    ModelState.AddModelError("", "Image upload failed via Functions API.");
+                    return View(model);
+                }
+            }
+
+            var payload = new ProductUpsertDto(
+                RowKey: model.RowKey!,
+                Name: model.Name ?? string.Empty,
+                Description: model.Description,
+                Price: model.Price,
+                ImageUrl: imageUrl
+            );
+
+            var res = await _fx.PostJsonAsync("products", payload);
+            if (res is null)
+            {
+                ModelState.AddModelError("", "Product update failed via Functions API.");
+                return View(model);
+            }
+
+            return RedirectToAction(nameof(Index));
+        }
+
+        // GET: Products/Delete/{id}
+        public async Task<IActionResult> Delete(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id)) return NotFound();
+            var e = await _table.GetEntityAsync(_opts.ProductsTable, "PRODUCT", id);
+            if (e is null) return NotFound();
+            return View(MapToVm(e));
+        }
+
+        // NOTE: If you want to support delete, you can either:
+        // 1) Add a Products Delete function, OR
+        // 2) Keep deletes as direct table writes (brief only mandates Orders to be queue-updated).
+        // Below we keep a direct delete for Products for simplicity. If you implemented a Function,
+        // swap this to _fx.DeleteAsync("products/{id}") accordingly.
+
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(string id)
         {
-            var entity = await _table.GetEntityAsync(_opts.ProductsTable, "PRODUCT", id);
-            if (entity != null)
-            {
-                // Delete the associated image from blob storage
-                var imageUrl = entity.GetString("ImageUrl");
-                await _blob.DeleteFileAsync(_opts.BlobContainer, imageUrl);
-
-                // Delete the entity from table storage
-                await _table.DeleteEntityAsync(_opts.ProductsTable, "PRODUCT", id);
-            }
+            await _table.DeleteEntityAsync(_opts.ProductsTable, "PRODUCT", id);
             return RedirectToAction(nameof(Index));
         }
+
+        // ---------------- helpers ----------------
+
+        private static ProductDto MapToVm(TableEntity e) => new ProductDto
+        {
+            RowKey = e.RowKey,
+            Name = e.GetString("Name") ?? "",
+            Description = e.GetString("Description"),
+            Price = (decimal)(e.GetDouble("Price") ?? 0.0),
+            ImageUrl = e.GetString("ImageUrl")
+        };
+
+        private record ProductUpsertDto(string RowKey, string Name, string? Description, decimal Price, string? ImageUrl);
     }
 }

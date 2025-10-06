@@ -15,6 +15,10 @@ builder.Services.AddSingleton<TableStorageService>();
 builder.Services.AddSingleton<BlobStorageService>();
 builder.Services.AddSingleton<QueueStorageService>();
 builder.Services.AddSingleton<FileStorageService>();
+// Register function service
+builder.Services.Configure<FunctionApiOptions>(builder.Configuration.GetSection("FunctionApi"));
+builder.Services.AddHttpClient<FunctionApiClient>();
+
 
 var app = builder.Build();
 

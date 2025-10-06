@@ -1,4 +1,9 @@
-﻿using AzureRetailHub.Models;
+﻿/*
+ * Jeron Okkers
+ * ST10447759
+ * PROG6221
+ */ 
+using AzureRetailHub.Models;
 using AzureRetailHub.Services;
 using AzureRetailHub.Settings;
 using Microsoft.AspNetCore.Http;
@@ -94,3 +99,4 @@ namespace AzureRetailHub.Controllers
         }
     }
 }
+//================================================================================================================================================================//

@@ -1,3 +1,8 @@
+/*
+ * Jeron Okkers
+ * ST10447759
+ * PROG6221
+ */ 
 namespace AzureRetailHub.Models
 {
     public class ErrorViewModel
@@ -7,3 +12,4 @@ namespace AzureRetailHub.Models
         public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
     }
 }
+//================================================================================================================================================================//

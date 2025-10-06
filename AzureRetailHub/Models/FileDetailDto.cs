@@ -1,4 +1,9 @@
-﻿namespace AzureRetailHub.Models
+﻿/*
+ * Jeron Okkers
+ * ST10447759
+ * PROG6221
+ */ 
+namespace AzureRetailHub.Models
 {
     public class FileDetailDto
     {
@@ -7,3 +12,4 @@
         public DateTimeOffset? UploadedOn { get; set; }
     }
 }
+//================================================================================================================================================================//

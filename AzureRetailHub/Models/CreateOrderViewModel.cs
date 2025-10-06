@@ -1,4 +1,9 @@
-﻿namespace AzureRetailHub.Models
+﻿/*
+ * Jeron Okkers
+ * ST10447759
+ * PROG6221
+ */ 
+namespace AzureRetailHub.Models
 {
     public class CreateOrderViewModel
     {
@@ -7,3 +12,4 @@
         public IEnumerable<ProductDto> AvailableProducts { get; set; } = new List<ProductDto>();
     }
 }
+//================================================================================================================================================================//

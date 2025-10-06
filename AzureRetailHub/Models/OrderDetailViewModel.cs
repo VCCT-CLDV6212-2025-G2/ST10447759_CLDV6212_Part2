@@ -1,4 +1,9 @@
-﻿using System.Collections.Generic;
+﻿/*
+ * Jeron Okkers
+ * ST10447759
+ * PROG6221
+ */ 
+using System.Collections.Generic;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -53,3 +58,4 @@ namespace AzureRetailHub.Models
         public decimal TotalPrice => Quantity * Price;
     }
 }
+//================================================================================================================================================================//

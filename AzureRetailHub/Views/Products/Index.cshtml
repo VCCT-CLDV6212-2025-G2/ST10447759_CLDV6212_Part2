@@ -24,6 +24,11 @@
     <h1>Products</h1>
     <a asp-action="Create" class="btn btn-primary">Create New</a>
 </div>
+<form method="get" class="mb-3 d-flex gap-2">
+    <input class="form-control" name="q" value="@ViewBag.Query" placeholder="Search products..." />
+    <button class="btn btn-primary">Search</button>
+</form>
+
 
 <div class="row">
     @foreach (var item in Model)

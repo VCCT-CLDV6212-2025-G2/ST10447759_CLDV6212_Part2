@@ -1,3 +1,8 @@
+/*
+ * Jeron Okkers
+ * ST10447759
+ * PROG6221
+ */ 
 using AzureRetailHub.Models;
 using AzureRetailHub.Services;
 using AzureRetailHub.Settings;
@@ -52,3 +57,4 @@ namespace AzureRetailHub.Controllers
         public List<ProductDto> BestSellers { get; set; } = new();
     }
 }
+//================================================================================================================================================================//

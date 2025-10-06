@@ -3,12 +3,12 @@
  * PROJECT: AzureRetailHub
  * PROGRAMMER: Jeron Okkers ST10447759
  * DESCRIPTION:
- * This service class encapsulates all interactions with Azure Table Storage.
- * It provides a centralized way to manage table clients and perform CRUD 
- * (Create, Read, Update, Delete) operations on table entities.
- * REFERENCE: Microsoft Docs, "Get started with Azure Table Storage"
- * https://learn.microsoft.com/en-us/azure/storage/tables/storage-tables-dotnet-get-started
+ * Centralized Table Storage helper for CRUD with sane defaults:
+ *  - Update defaults to MERGE (partial updates)
+ *  - Upsert supported (MERGE by default)
+ *  - GetEntityAsync returns null on 404 (instead of throwing)
  */
+
 using Azure;
 using Azure.Data.Tables;
 using Microsoft.Extensions.Options;
@@ -21,15 +21,13 @@ namespace AzureRetailHub.Services
         private readonly TableServiceClient _tableServiceClient;
         private readonly StorageOptions _opts;
 
-        // The constructor uses Dependency Injection to get the connection string from appsettings.json.
         public TableStorageService(IOptions<StorageOptions> options)
         {
             _opts = options.Value;
-            // The TableServiceClient is the main entry point for interacting with the Table Storage service.
             _tableServiceClient = new TableServiceClient(_opts.ConnectionString);
         }
 
-        /// Gets a client for a specific table, creating the table if it doesn't exist.
+        /// Get a client for a specific table (creates if missing).
         public async Task<TableClient> GetTableClientAsync(string tableName)
         {
             var client = _tableServiceClient.GetTableClient(tableName);
@@ -37,18 +35,14 @@ namespace AzureRetailHub.Services
             return client;
         }
 
-        /// Adds a new entity to a specified table.
+        /// Add a new entity.
         public async Task AddEntityAsync(string tableName, TableEntity entity)
         {
             var table = await GetTableClientAsync(tableName);
             await table.AddEntityAsync(entity);
         }
 
-        /// Queries for entities in a table, optionally applying a filter.
-        /// </summary>
-        /// <param name="tableName">The name of the table.</param>
-        /// <param name="filter">An OData filter string (optional).</param>
-        /// <returns>An asynchronous stream of TableEntity objects.</returns>
+        /// Query entities with optional OData filter.
         public async IAsyncEnumerable<TableEntity> QueryEntitiesAsync(string tableName, string? filter = null)
         {
             var table = await GetTableClientAsync(tableName);
@@ -58,25 +52,47 @@ namespace AzureRetailHub.Services
             }
         }
 
-        /// Retrieves an entity from a table using its partition and row key.
-
+        /// Get a single entity; returns null if not found.
         public async Task<TableEntity?> GetEntityAsync(string tableName, string partitionKey, string rowKey)
         {
-            // NOTE: This method is used to get all items from a table (like all products or all customers).
-            // It uses IAsyncEnumerable for efficiency, processing each entity one by one instead of loading them all into memory at once.
             var table = await GetTableClientAsync(tableName);
-            var response = await table.GetEntityAsync<TableEntity>(partitionKey, rowKey);
-            return response.Value;
+            try
+            {
+                var resp = await table.GetEntityAsync<TableEntity>(partitionKey, rowKey);
+                return resp.Value;
+            }
+            catch (RequestFailedException ex) when (ex.Status == 404)
+            {
+                return null;
+            }
         }
 
-        /// Updates an existing entity in a table.
-        public async Task UpdateEntityAsync(string tableName, TableEntity entity)
+        /// Update an entity. Defaults to MERGE (partial update). If no ETag is present, uses ETag.All.
+        public async Task UpdateEntityAsync(
+            string tableName,
+            TableEntity entity,
+            TableUpdateMode mode = TableUpdateMode.Merge)
         {
             var table = await GetTableClientAsync(tableName);
-            await table.UpdateEntityAsync(entity, ETag.All, TableUpdateMode.Replace);
+
+            // If caller didn't supply an ETag (common for partial entities), use ETag.All (unconditional).
+            ETag etag = entity.ETag;
+            if (etag == default) etag = ETag.All;
+
+            await table.UpdateEntityAsync(entity, etag, mode);
         }
 
-        /// Deletes an entity from a table using its partition and row key.
+        /// Upsert an entity (insert or update). Defaults to MERGE semantics.
+        public async Task UpsertEntityAsync(
+            string tableName,
+            TableEntity entity,
+            TableUpdateMode mode = TableUpdateMode.Merge)
+        {
+            var table = await GetTableClientAsync(tableName);
+            await table.UpsertEntityAsync(entity, mode);
+        }
+
+        /// Delete an entity.
         public async Task DeleteEntityAsync(string tableName, string partitionKey, string rowKey)
         {
             var table = await GetTableClientAsync(tableName);

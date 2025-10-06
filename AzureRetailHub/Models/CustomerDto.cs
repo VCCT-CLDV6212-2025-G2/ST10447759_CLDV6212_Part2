@@ -1,4 +1,9 @@
-﻿using System.ComponentModel.DataAnnotations;
+﻿/*
+ * Jeron Okkers
+ * ST10447759
+ * PROG6221
+ */ 
+using System.ComponentModel.DataAnnotations;
 
 namespace AzureRetailHub.Models
 {
@@ -10,3 +15,4 @@ namespace AzureRetailHub.Models
         public string? Phone { get; set; }
     }
 }
+//================================================================================================================================================================//
