@@ -8,23 +8,51 @@ using Microsoft.Extensions.Logging;
 
 namespace AzureRetailHub.Functions.Functions;
 
+/// <summary>
+/// Queue-triggered function that processes order messages and persists
+/// them into Azure Table Storage (Orders table).
+/// 
+/// Config keys expected:
+///   - StorageOptions:ConnectionString
+///   - StorageOptions:OrdersTable
+///   - StorageOptions:QueueName (in the QueueTrigger)
+/// 
+/// Behavior:
+/// - Accepts Base64 or raw JSON queue messages.
+/// - Supports "CreateOrUpdate" and "Delete" actions.
+/// - Uses PartitionKey = "ORDER", RowKey = OrderId.
+/// </summary>
 public class OrdersQueueProcessor
 {
     private readonly IConfiguration _config;
     public OrdersQueueProcessor(IConfiguration config) => _config = config;
 
-    public record OrderMessage(string Action, string OrderId, string CustomerId, string? Status, double? TotalAmount,
-                               DateTime? OrderDate, string? ItemsJson);
+    /// <summary>
+    /// Contract for queue message payloads.
+    /// Only the fields you need for persistence—kept minimal on purpose.
+    /// </summary>
+    public record OrderMessage(
+        string Action,
+        string OrderId,
+        string CustomerId,
+        string? Status,
+        double? TotalAmount,
+        DateTime? OrderDate,
+        string? ItemsJson);
 
+    /// <summary>
+    /// Triggered automatically when a new message is available on the queue.
+    /// </summary>
     [Function("OrdersQueueProcessor")]
     public async Task Run(
-    [QueueTrigger("%StorageOptions:QueueName%", Connection = "AzureWebJobsStorage")] string message,
-    FunctionContext context)
+        [QueueTrigger("%StorageOptions:QueueName%", Connection = "AzureWebJobsStorage")] string message,
+        FunctionContext context)
     {
         var log = context.GetLogger("OrdersQueueProcessor");
+
         try
         {
-            // 👇 Accept both: try Base64 → fallback to raw JSON
+            // Accept both: try Base64 → fallback to raw JSON
             string json;
             try
             {
@@ -32,20 +60,27 @@ public class OrdersQueueProcessor
             }
             catch (FormatException)
             {
-                json = message; // not Base64 — treat as plain JSON
+                json = message; // Not Base64 — treat as plain JSON
             }
 
-            var data = System.Text.Json.JsonSerializer.Deserialize<OrderMessage>(
+            // Deserialize loosely (case-insensitive for easier clients)
+            var data = JsonSerializer.Deserialize<OrderMessage>(
                 json,
-                new System.Text.Json.JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
-            if (data is null) { log.LogWarning("Invalid message payload"); return; }
+            if (data is null)
+            {
+                log.LogWarning("Invalid message payload");
+                return;
+            }
 
+            // Prepare Table client and ensure table exists
             var cs = _config["StorageOptions:ConnectionString"];
             var tableName = _config["StorageOptions:OrdersTable"];
             var table = new TableClient(cs, tableName);
             await table.CreateIfNotExistsAsync();
 
+            // Route by action
             if (string.Equals(data.Action, "CreateOrUpdate", StringComparison.OrdinalIgnoreCase))
             {
                 var entity = new TableEntity("ORDER", data.OrderId)
@@ -56,11 +91,14 @@ public class OrdersQueueProcessor
                     ["OrderDate"] = data.OrderDate ?? DateTime.UtcNow,
                     ["ItemsJson"] = data.ItemsJson ?? "[]"
                 };
+
                 await table.UpsertEntityAsync(entity, TableUpdateMode.Replace);
+                log.LogInformation("Upserted Order {orderId}", data.OrderId);
             }
             else if (string.Equals(data.Action, "Delete", StringComparison.OrdinalIgnoreCase))
             {
                 await table.DeleteEntityAsync("ORDER", data.OrderId);
+                log.LogInformation("Deleted Order {orderId}", data.OrderId);
             }
             else
             {
@@ -69,9 +107,9 @@ public class OrdersQueueProcessor
         }
         catch (Exception ex)
         {
+            // Bubble up for poison-queue handling while capturing context
             context.GetLogger("OrdersQueueProcessor").LogError(ex, "Failed processing order message");
             throw;
         }
     }
-
 }
